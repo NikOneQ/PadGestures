@@ -27,8 +27,8 @@ using UIA = System.Windows.Automation;
 [assembly: AssemblyTitle("PadGestures")]
 [assembly: AssemblyProduct("PadGestures")]
 [assembly: AssemblyDescription("Custom edge gestures for Windows Precision Touchpads")]
-[assembly: AssemblyVersion("1.0.0.0")]
-[assembly: AssemblyFileVersion("1.0.0.0")]
+[assembly: AssemblyVersion("1.1.0.0")]
+[assembly: AssemblyFileVersion("1.1.0.0")]
 
 namespace PadGestures
 {
@@ -510,7 +510,7 @@ namespace PadGestures
     }
 
     // ======================= Яркость / Brightness (WMI) =======================
-    // WMI медленный: копим шаги и применяем не чаще раза в 80 мс. После свайпа проверяем значение:
+    // WMI применяет яркость за ~10 мс: копим изменения и применяем не чаще раза в 16 мс (≈60 Гц). После свайпа проверяем значение:
     // ASUS ScreenXpert синхронизирует яркость экранов и может с задержкой вернуть старое значение — тогда ставим заново.
     class BrightnessControl
     {
@@ -529,7 +529,7 @@ namespace PadGestures
             {
                 var n0 = DateTime.UtcNow;
                 int wait = -1;
-                if (target >= 0 && target != applied) wait = Math.Max(0, 80 - (int)(n0 - lastSet).TotalMilliseconds);
+                if (target >= 0 && target != applied) wait = Math.Max(0, 20 - (int)(n0 - lastSet).TotalMilliseconds);
                 else if (verifyAt != DateTime.MaxValue) wait = Math.Max(0, (int)(verifyAt - n0).TotalMilliseconds);
                 ev.WaitOne(wait);
                 int d; lock (lk) { d = pendingDelta; pendingDelta = 0; }
@@ -541,13 +541,22 @@ namespace PadGestures
                         // пока идёт жест — считаем от своей цели, а не от (запаздывающего) значения системы
                         int cur = (target >= 0 && (now - targetAt).TotalSeconds < 3) ? target : Read();
                         if (cur < 0) continue;
+                        if (target < 0 || (now - targetAt).TotalSeconds >= 3) applied = cur;
                         target = Math.Max(0, Math.Min(100, cur + d)); targetAt = now; verifies = 0;
+                        // цель не убегает от реальной яркости дальше чем на MaxLead: иначе при развороте пальца
+                        // яркость сначала «доезжает» до старой цели — выглядит как прыжок назад
+                        if (applied >= 0) target = Math.Max(applied - MaxLead, Math.Min(applied + MaxLead, target));
                         var inf = Info; if (inf != null) inf(target);
                     }
-                    if (target >= 0 && target != applied && (now - lastSet).TotalMilliseconds >= 80)
+                    if (target >= 0 && target != applied && (now - lastSet).TotalMilliseconds >= 20)
                     {
-                        Apply(target);
-                        applied = target; lastSet = DateTime.UtcNow; verifyAt = lastSet.AddMilliseconds(500);
+                        // плавно догоняем цель, не больше 3 % за 20 мс: на больших скачках синхронизация
+                        // ASUS ScreenXpert возвращала старое значение («откат»), на мелких шагах — нет
+                        int from = applied >= 0 ? applied : target;
+                        int next = from + Math.Max(-MaxStep, Math.Min(MaxStep, target - from));
+                        lastSet = now;   // период 20 мс считаем от начала записи / 20 ms period from write start
+                        Apply(next);
+                        applied = next; verifyAt = DateTime.UtcNow.AddMilliseconds(700);
                     }
                     else if (target == applied && verifyAt != DateTime.MaxValue && now >= verifyAt)
                     {
@@ -555,7 +564,7 @@ namespace PadGestures
                         if (real >= 0 && real != target && verifies < 4)
                         {
                             Program.Log("BRIGHT bounced " + real + " -> " + target);
-                            verifies++; Apply(target); lastSet = DateTime.UtcNow; verifyAt = lastSet.AddMilliseconds(600);
+                            verifies++; Apply(target); lastSet = DateTime.UtcNow; verifyAt = lastSet.AddMilliseconds(700);
                         }
                         else verifyAt = DateTime.MaxValue;
                     }
@@ -564,8 +573,12 @@ namespace PadGestures
             }
         }
 
+        const int MaxStep = 3;   // % за одну запись / per write
+        const int MaxLead = 6;   // насколько цель может опережать экран / how far the target may run ahead
+
         static void Apply(int t)
         {
+            Program.Log("BRIGHT set " + t);
             using (var cls = new System.Management.ManagementClass(@"root\WMI", "WmiMonitorBrightnessMethods", null))
                 foreach (System.Management.ManagementObject o in cls.GetInstances())
                     using (o) o.InvokeMethod("WmiSetBrightness", new object[] { (uint)0, (byte)t });
@@ -586,7 +599,7 @@ namespace PadGestures
         public int Mode;          // 0 idle, 1 gesture, 2 ignore until lift
         public ZoneCfg Zone;
         public uint Id;
-        public double SX, SY, LX, LY, Acc;
+        public double SX, SY, LX, LY, Acc, Frac;
         public bool Locked;
         public DateTime Last, LastMove;
         public int FrameCount;
@@ -699,7 +712,7 @@ namespace PadGestures
             {
                 var z = cfg.Enabled ? FindZone(fx, fy) : null;
                 if (z == null) { st.Mode = 2; return; }
-                st.Mode = 1; st.Zone = z; st.Id = fid; st.SX = st.LX = fx; st.SY = st.LY = fy; st.Acc = 0; st.Locked = false; st.LastMove = now;
+                st.Mode = 1; st.Zone = z; st.Id = fid; st.SX = st.LX = fx; st.SY = st.LY = fy; st.Acc = 0; st.Frac = 0; st.Locked = false; st.LastMove = now;
                 ActiveZone = z;
                 if (cfg.FreezeCursor) Freeze();
                 if (z.Action == 1 && !OwnWindowActive()) Seeker.Prepare(Native.GetForegroundWindow());
@@ -732,8 +745,37 @@ namespace PadGestures
                 if (mult > cap) mult = cap;
             }
             double step = Math.Max(0.01, zone.StepPct / 100.0);
+            if (zone.Action == 2 || zone.Action == 5)
+            {
+                // плавно: значение идёт за пальцем по 1 %, «за шаг» задаёт сколько % на один шаг пути
+                // smooth: the value follows the finger in 1 % increments
+                int amount = zone.Action == 2 ? Math.Max(1, zone.VolStep) : Math.Max(1, zone.BrightStep);
+                double sign = zone.Invert ? -1 : 1;
+                int accel = zone.Action == 5 ? 1 : Math.Min(mult, 3);   // яркость без ускорения — экран не успевает
+                st.Frac += along / step * amount * accel * sign;
+                st.Acc = 0;
+                int whole = (int)st.Frac;   // к нулю / truncates toward zero
+                if (whole != 0) { st.Frac -= whole; Smooth(zone, whole); }
+                return;
+            }
             while (st.Acc >= step) { Fire(zone, +1, mult); st.Acc -= step; }
             while (st.Acc <= -step) { Fire(zone, -1, mult); st.Acc += step; }
+        }
+
+        void Smooth(ZoneCfg z, int delta)
+        {
+            string text;
+            if (z.Action == 2)
+            {
+                int v = Volume.Change(delta);
+                text = (delta > 0 ? "🔊  " : "🔉  ") + L.T("Громкость", "Volume") + (v >= 0 ? " " + v + " %" : "");
+            }
+            else
+            {
+                Bright.Add(delta);
+                text = "☀  " + (delta > 0 ? L.T("Ярче", "Brighter") : L.T("Темнее", "Dimmer"));
+            }
+            var f = Fired; if (f != null) f(text);
         }
 
         void End(TouchState st)
@@ -1406,7 +1448,7 @@ namespace PadGestures
 
     static class Program
     {
-        public const string Version = "1.0.0";
+        public const string Version = "1.1.0";
         public static string DataDir { get { return System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "PadGestures"); } }
 
         static StreamWriter logW;

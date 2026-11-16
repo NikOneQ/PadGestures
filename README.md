@@ -82,7 +82,12 @@ To restore it: `Set-Service AsusPTPService -StartupType Automatic; Start-Service
 
 - Touchpad data is read through the **Raw Input API** (HID digitizer usage page `0x0D`, touch pad `0x05`), parsed with `hid.dll`. PadGestures only **reads** touches and never blocks them.
 - Seeking uses **UI Automation**: the browser exposes the video player's progress slider, and PadGestures sets its value directly. It keeps track of the target position itself, sends at most one update every 200 ms and checks the result afterwards, because some players (such as Google Drive) ignore commands while they are still seeking.
-- Volume and tracks use the standard media keys. Brightness uses WMI (`WmiMonitorBrightnessMethods`), so it only changes displays that support it, usually the built-in main display.
+- **Volume** is set directly through Windows Core Audio (`IAudioEndpointVolume`), so it can change in 1 % steps (the volume keys always change it by 2 %). It follows your finger smoothly. **Tracks** use the standard media keys.
+- **Brightness** uses WMI (`WmiMonitorBrightnessMethods`), so it only changes displays that support it, usually the built-in main display. To change it smoothly, the value chases your finger by at most 3 % every 20 ms.
+
+### Known issue: brightness sometimes jumps back
+
+On some laptops (seen on the ASUS Zenbook Duo with an OLED display) the brightness can briefly jump back to an older value during long, very fast swipes back and forth. The jump comes from the vendor software and display driver, not from PadGestures: it also happens when brightness is changed by a plain script, and to some extent with the Fn keys. PadGestures checks the brightness after a swipe and sets the right value again if it was reverted. With normal swipes it's barely noticeable.
 
 ## Building from source
 
