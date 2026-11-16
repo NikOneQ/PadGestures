@@ -1,0 +1,325 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="PadGestures" Width="1060" Height="860" MinWidth="560" MinHeight="520"
+        WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource Bg}" Foreground="{DynamicResource OnSurface}"
+        FontFamily="Segoe UI Variable Text, Segoe UI" FontSize="14"
+        UseLayoutRounding="True" SnapsToDevicePixels="True">
+  <Window.Resources>
+
+    <CubicEase x:Key="EaseOut" EasingMode="EaseOut"/>
+
+    <!-- Карточка -->
+    <Style x:Key="Card" TargetType="Border">
+      <Setter Property="Background" Value="{DynamicResource Surface}"/>
+      <Setter Property="CornerRadius" Value="28"/>
+      <Setter Property="Padding" Value="22"/>
+      <Setter Property="Margin" Value="8"/>
+    </Style>
+
+    <!-- Переключатель M3 -->
+    <Style x:Key="M3Switch" TargetType="CheckBox">
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Focusable" Value="False"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="CheckBox">
+            <Grid Background="Transparent">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+              </Grid.ColumnDefinitions>
+              <ContentPresenter VerticalAlignment="Center" Margin="0,0,16,0"/>
+              <Border x:Name="Track" Grid.Column="1" Width="52" Height="32" CornerRadius="16"
+                      Background="{DynamicResource SurfaceHighest}" BorderBrush="{DynamicResource Outline}" BorderThickness="2">
+                <Ellipse x:Name="Thumb" Width="16" Height="16" HorizontalAlignment="Left" Margin="6,0,0,0"
+                         Fill="{DynamicResource Outline}" RenderTransformOrigin="0.5,0.5">
+                  <Ellipse.RenderTransform>
+                    <TransformGroup>
+                      <ScaleTransform/>
+                      <TranslateTransform/>
+                    </TransformGroup>
+                  </Ellipse.RenderTransform>
+                </Ellipse>
+              </Border>
+            </Grid>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsChecked" Value="True">
+                <Setter TargetName="Track" Property="Background" Value="{DynamicResource Primary}"/>
+                <Setter TargetName="Track" Property="BorderBrush" Value="{DynamicResource Primary}"/>
+                <Setter TargetName="Thumb" Property="Fill" Value="{DynamicResource OnPrimary}"/>
+                <Trigger.EnterActions>
+                  <BeginStoryboard>
+                    <Storyboard>
+                      <DoubleAnimation Storyboard.TargetName="Thumb" Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[1].(TranslateTransform.X)" To="20" Duration="0:0:0.45">
+                        <DoubleAnimation.EasingFunction><BackEase EasingMode="EaseOut" Amplitude="0.7"/></DoubleAnimation.EasingFunction>
+                      </DoubleAnimation>
+                      <DoubleAnimation Storyboard.TargetName="Thumb" Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[0].(ScaleTransform.ScaleX)" To="1.5" Duration="0:0:0.35" EasingFunction="{StaticResource EaseOut}"/>
+                      <DoubleAnimation Storyboard.TargetName="Thumb" Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[0].(ScaleTransform.ScaleY)" To="1.5" Duration="0:0:0.35" EasingFunction="{StaticResource EaseOut}"/>
+                    </Storyboard>
+                  </BeginStoryboard>
+                </Trigger.EnterActions>
+                <Trigger.ExitActions>
+                  <BeginStoryboard>
+                    <Storyboard>
+                      <DoubleAnimation Storyboard.TargetName="Thumb" Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[1].(TranslateTransform.X)" To="0" Duration="0:0:0.45">
+                        <DoubleAnimation.EasingFunction><BackEase EasingMode="EaseOut" Amplitude="0.7"/></DoubleAnimation.EasingFunction>
+                      </DoubleAnimation>
+                      <DoubleAnimation Storyboard.TargetName="Thumb" Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[0].(ScaleTransform.ScaleX)" To="1" Duration="0:0:0.3" EasingFunction="{StaticResource EaseOut}"/>
+                      <DoubleAnimation Storyboard.TargetName="Thumb" Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[0].(ScaleTransform.ScaleY)" To="1" Duration="0:0:0.3" EasingFunction="{StaticResource EaseOut}"/>
+                    </Storyboard>
+                  </BeginStoryboard>
+                </Trigger.ExitActions>
+              </Trigger>
+              <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Opacity" Value="0.4"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <!-- Чип: выбранный — «пилюля», невыбранный — скруглённый квадрат -->
+    <Style x:Key="Chip" TargetType="RadioButton">
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Focusable" Value="False"/>
+      <Setter Property="Margin" Value="0,0,8,8"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="Foreground" Value="{DynamicResource OnSurfaceVariant}"/>
+      <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
+      <Setter Property="RenderTransform"><Setter.Value><ScaleTransform/></Setter.Value></Setter>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="RadioButton">
+            <Border x:Name="B" CornerRadius="12" Padding="16,9" BorderThickness="1.5"
+                    BorderBrush="{DynamicResource OutlineVariant}" Background="Transparent">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="B" Property="Background" Value="{DynamicResource SurfaceHighest}"/>
+              </Trigger>
+              <Trigger Property="IsChecked" Value="True">
+                <Setter TargetName="B" Property="Background" Value="{DynamicResource SecondaryContainer}"/>
+                <Setter TargetName="B" Property="BorderBrush" Value="{DynamicResource SecondaryContainer}"/>
+                <Setter TargetName="B" Property="CornerRadius" Value="20"/>
+                <Setter Property="Foreground" Value="{DynamicResource OnSecondaryContainer}"/>
+              </Trigger>
+              <Trigger Property="IsPressed" Value="True">
+                <Trigger.EnterActions>
+                  <BeginStoryboard>
+                    <Storyboard>
+                      <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" To="0.92" Duration="0:0:0.1"/>
+                      <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" To="0.92" Duration="0:0:0.1"/>
+                    </Storyboard>
+                  </BeginStoryboard>
+                </Trigger.EnterActions>
+                <Trigger.ExitActions>
+                  <BeginStoryboard>
+                    <Storyboard>
+                      <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" To="1" Duration="0:0:0.5">
+                        <DoubleAnimation.EasingFunction><ElasticEase Oscillations="1" Springiness="5"/></DoubleAnimation.EasingFunction>
+                      </DoubleAnimation>
+                      <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" To="1" Duration="0:0:0.5">
+                        <DoubleAnimation.EasingFunction><ElasticEase Oscillations="1" Springiness="5"/></DoubleAnimation.EasingFunction>
+                      </DoubleAnimation>
+                    </Storyboard>
+                  </BeginStoryboard>
+                </Trigger.ExitActions>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <!-- Слайдер M3 Expressive: толстая дорожка, зазор, вертикальная ручка -->
+    <Style x:Key="TrackFill" TargetType="RepeatButton">
+      <Setter Property="Focusable" Value="False"/>
+      <Setter Property="OverridesDefaultStyle" Value="True"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="RepeatButton">
+            <Grid Background="Transparent">
+              <Border Height="16" CornerRadius="8,3,3,8" Margin="0,0,6,0" Background="{DynamicResource Primary}"/>
+            </Grid>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style x:Key="TrackRest" TargetType="RepeatButton">
+      <Setter Property="Focusable" Value="False"/>
+      <Setter Property="OverridesDefaultStyle" Value="True"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="RepeatButton">
+            <Grid Background="Transparent">
+              <Border Height="16" CornerRadius="3,8,8,3" Margin="6,0,0,0" Background="{DynamicResource SecondaryContainer}"/>
+            </Grid>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style x:Key="BarThumb" TargetType="Thumb">
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Thumb">
+            <Grid Background="Transparent" Width="10">
+              <Border x:Name="Bar" Width="4" Height="40" CornerRadius="2" Background="{DynamicResource Primary}"/>
+            </Grid>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsDragging" Value="True">
+                <Setter TargetName="Bar" Property="Width" Value="2"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style x:Key="M3Slider" TargetType="Slider">
+      <Setter Property="IsSnapToTickEnabled" Value="True"/>
+      <Setter Property="IsMoveToPointEnabled" Value="True"/>
+      <Setter Property="Focusable" Value="False"/>
+      <Setter Property="Height" Value="44"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Slider">
+            <Track x:Name="PART_Track">
+              <Track.DecreaseRepeatButton>
+                <RepeatButton Command="Slider.DecreaseLarge" Style="{StaticResource TrackFill}"/>
+              </Track.DecreaseRepeatButton>
+              <Track.IncreaseRepeatButton>
+                <RepeatButton Command="Slider.IncreaseLarge" Style="{StaticResource TrackRest}"/>
+              </Track.IncreaseRepeatButton>
+              <Track.Thumb>
+                <Thumb Style="{StaticResource BarThumb}"/>
+              </Track.Thumb>
+            </Track>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <!-- Поле ввода -->
+    <Style x:Key="M3TextBox" TargetType="TextBox">
+      <Setter Property="FontSize" Value="15"/>
+      <Setter Property="Foreground" Value="{DynamicResource OnSurface}"/>
+      <Setter Property="CaretBrush" Value="{DynamicResource Primary}"/>
+      <Setter Property="SelectionBrush" Value="{DynamicResource Primary}"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="TextBox">
+            <Border x:Name="B" CornerRadius="14" Padding="14,10" Background="{DynamicResource SurfaceHighest}"
+                    BorderThickness="2" BorderBrush="Transparent">
+              <ScrollViewer x:Name="PART_ContentHost" VerticalScrollBarVisibility="Hidden"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsKeyboardFocused" Value="True">
+                <Setter TargetName="B" Property="BorderBrush" Value="{DynamicResource Primary}"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <!-- Тональная кнопка -->
+    <Style x:Key="TonalButton" TargetType="Button">
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Focusable" Value="False"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="Foreground" Value="{DynamicResource OnSecondaryContainer}"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="B" CornerRadius="20" Padding="20,10" Background="{DynamicResource SecondaryContainer}">
+              <ContentPresenter HorizontalAlignment="Center"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="B" Property="Opacity" Value="0.85"/>
+              </Trigger>
+              <Trigger Property="IsPressed" Value="True">
+                <Setter TargetName="B" Property="CornerRadius" Value="10"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <Style TargetType="ScrollBar">
+      <Setter Property="Width" Value="6"/>
+      <Setter Property="MinWidth" Value="6"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ScrollBar">
+            <Track x:Name="PART_Track" IsDirectionReversed="True">
+              <Track.Thumb>
+                <Thumb>
+                  <Thumb.Template>
+                    <ControlTemplate TargetType="Thumb">
+                      <Border CornerRadius="3" Background="{DynamicResource OutlineVariant}"/>
+                    </ControlTemplate>
+                  </Thumb.Template>
+                </Thumb>
+              </Track.Thumb>
+            </Track>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+  </Window.Resources>
+
+  <ScrollViewer x:Name="Scroller" VerticalScrollBarVisibility="Auto" Padding="20,4,20,20">
+    <StackPanel MaxWidth="1120">
+
+      <!-- Шапка -->
+      <Grid Margin="12,10,12,14">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*"/>
+          <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+        <StackPanel>
+          <TextBlock x:Name="TitleText" FontFamily="Segoe UI Variable Display, Segoe UI" FontSize="40" FontWeight="Bold"/>
+          <TextBlock x:Name="StatusText" Foreground="{DynamicResource OnSurfaceVariant}" FontSize="15" Margin="2,2,0,0" TextWrapping="Wrap"/>
+        </StackPanel>
+        <Border Grid.Column="1" VerticalAlignment="Center" Background="{DynamicResource PrimaryContainer}" CornerRadius="26" Padding="22,12,14,12">
+          <CheckBox x:Name="MasterSwitch" Style="{StaticResource M3Switch}" Foreground="{DynamicResource OnPrimaryContainer}"
+                    FontWeight="SemiBold" FontSize="15"/>
+        </Border>
+      </Grid>
+
+      <!-- Живой просмотр -->
+      <Border Style="{StaticResource Card}" Padding="26">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="3*"/>
+            <ColumnDefinition Width="2*"/>
+          </Grid.ColumnDefinitions>
+          <Viewbox Stretch="Uniform" MaxHeight="290" HorizontalAlignment="Left">
+            <Canvas x:Name="PadCanvas" Width="600" Height="365"/>
+          </Viewbox>
+          <StackPanel Grid.Column="1" Margin="28,0,0,0" VerticalAlignment="Center">
+            <TextBlock x:Name="PreviewTitle" FontFamily="Segoe UI Variable Display, Segoe UI" FontSize="22" FontWeight="SemiBold"/>
+            <TextBlock x:Name="PreviewHint" TextWrapping="Wrap" Foreground="{DynamicResource OnSurfaceVariant}" Margin="0,6,0,18" LineHeight="20"/>
+            <Border x:Name="ActionPill" Background="{DynamicResource Primary}" CornerRadius="22" Padding="20,11"
+                    HorizontalAlignment="Left" Opacity="0" RenderTransformOrigin="0,0.5">
+              <Border.RenderTransform><ScaleTransform/></Border.RenderTransform>
+              <TextBlock x:Name="ActionText" Foreground="{DynamicResource OnPrimary}" FontSize="17" FontWeight="Bold"/>
+            </Border>
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <UniformGrid x:Name="ZonesHost" Columns="2"/>
+
+      <Border Style="{StaticResource Card}">
+        <StackPanel x:Name="GlobalHost"/>
+      </Border>
+
+    </StackPanel>
+  </ScrollViewer>
+</Window>

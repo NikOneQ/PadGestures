@@ -1,0 +1,5 @@
+dist/
+*.log
+*.ini
+check.txt
+crash.txt
